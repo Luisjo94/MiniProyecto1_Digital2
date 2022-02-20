@@ -1,0 +1,16 @@
+/* 
+ * File:  ADC_conf.h 
+ * Author: Luis José Archila
+ * Comments: configuración del ADC
+ * Revision history: 07/02/2022
+ */
+
+
+#ifndef ADC_CONFIG
+#define	ADC_CONFIG
+
+#include <xc.h>   
+
+void adc(void);
+
+#endif
