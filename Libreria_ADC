@@ -1,0 +1,15 @@
+#include "ADC_conf.h"
+#define _XTAL_FREQ 1000000
+    
+void adc(void)
+{
+    // Configuración ADC
+    ADCON1bits.ADFM  = 0;   
+    ADCON1bits.VCFG1 = 0;   
+    ADCON1bits.VCFG0 = 0;   
+    
+    ADCON0bits.ADCS = 0b01; 
+    ADCON0bits.CHS  = 0b1101;    //ANALOG 13  
+    ADCON0bits.ADON = 1;    
+    __delay_us(50);
+}
