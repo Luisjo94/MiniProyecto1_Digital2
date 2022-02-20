@@ -1,0 +1,68 @@
+#include "LCD_conf.h"
+#define _XTAL_FREQ 1000000
+
+void pulse(void)
+{
+    PORTDbits.RD6 = 1;
+    __delay_ms(4);
+    PORTDbits.RD6 = 0;
+    return;
+}
+
+void init_LCD(void)
+{
+    //inicializacion
+    __delay_ms(20);
+    PORTDbits.RD7 = 0;  //RS
+    PORTB = 0b00110000;
+    pulse();
+    
+    __delay_ms(10);
+    PORTDbits.RD7 = 0;
+    PORTB = 0b00110000;
+    pulse();
+    
+    __delay_us(150);
+    PORTDbits.RD7 = 0;
+    PORTB = 0b00110000;
+    pulse();
+    
+    
+    //activar visualizador
+    PORTDbits.RD7 = 0;
+    PORTB = 0b00111000; //38
+    pulse();
+    
+    //activar cursor
+    PORTDbits.RD7 = 0;
+    PORTB = 0b00001100; //0C
+    pulse();
+    
+    //clear
+    PORTDbits.RD7 = 0;
+    PORTB = 0x01;
+    pulse();
+
+    PORTDbits.RD7 = 0;
+    PORTB = 0x06;
+    pulse();
+    
+    return;
+}
+
+
+void WriteChar(char a)
+{
+    PORTDbits.RD7 = 1;  //RS
+    PORTB = a;
+    pulse();
+}
+
+
+void SetCursor(uint8_t p)
+{
+    PORTDbits.RD7 = 0;
+    PORTB = 0b10000000 + p;
+    pulse();
+    __delay_ms(4);
+}
