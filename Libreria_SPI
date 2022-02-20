@@ -1,0 +1,54 @@
+#include "SPI_conf.h"
+
+void SPI_MasterMode (void)
+{
+    SSPCONbits.SSPEN = 0; //habilitar puerto serial
+    SSPCONbits.CKP = 1; //high level clock
+    SSPCONbits.SSPM = 0;    //master mode Fosc/4
+    
+    SSPSTATbits.SMP = 1;    //in data sample at middle time
+    SSPSTATbits.CKE = 0;    //transmits at rising edge
+    
+    SSPCONbits.SSPEN = 1;
+    
+    return;
+}
+
+
+void SPI_SlaveMode(void)
+{ 
+    SSPCONbits.SSPEN = 0;
+    SSPCONbits.CKP = 1; //high level clock
+    SSPCONbits.SSPM = 0b0100;    //slave mode ss pin enabled
+    
+    SSPSTATbits.CKE = 0;    //transmits at rising edge
+    
+    SSPCONbits.SSPEN = 1;
+    
+    return;
+}
+
+
+void SPI_Write(char data)
+{
+    SSPBUF = data;
+}
+
+void ReceiveWait()
+{
+    while (!SSPSTATbits.BF);    //esperar a que se complete la recepcion
+}
+
+unsigned SPI_DataREady()    //revisa si los datos estan listos para ser leidos
+{
+    if (SSPSTATbits.BF)
+        return 1;
+    else
+        return 0;
+}
+
+char SPI_Read()
+{
+    ReceiveWait();  //que todos los bits esten listos
+    return(SSPBUF); //leer el buffer
+}
