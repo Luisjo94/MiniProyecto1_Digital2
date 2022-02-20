@@ -1,0 +1,20 @@
+/* 
+ * File: SPI_conf.h  
+ * Author: Luis José Archila
+ * Comments: iniciar la configuración para comunicación serial con protocolo SPI
+ * Revision history: 07/02/2022
+ */
+
+ 
+#ifndef SPI_CONF
+#define	SPI_CONF
+
+#include <xc.h>  
+
+void SPI_MasterMode(void);
+void SPI_SlaveMode(void);
+void SPI_Write(char data);
+unsigned SPI_DataREady(void);
+char SPI_Read(void);
+
+#endif
