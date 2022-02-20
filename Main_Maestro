@@ -1,0 +1,395 @@
+/*
+ * Mini Proyecto 1: Master
+ * Luis José Archila, 20403
+ * Electrónica Digital 2
+ */
+
+/*----------------------------------------------------------------------------*/
+/*                           BITS DE CONFIGURACIÓN                            */
+/*----------------------------------------------------------------------------*/
+
+// PIC16F887 Configuration Bit Settings
+
+// 'C' source line config statements
+
+// CONFIG1
+#pragma config FOSC = INTRC_NOCLKOUT// Oscillator Selection bits (INTOSCIO oscillator: I/O function on RA6/OSC2/CLKOUT pin, I/O function on RA7/OSC1/CLKIN)
+#pragma config WDTE = OFF       // Watchdog Timer Enable bit (WDT disabled and can be enabled by SWDTEN bit of the WDTCON register)
+#pragma config PWRTE = OFF      // Power-up Timer Enable bit (PWRT disabled)
+#pragma config MCLRE = OFF      // RE3/MCLR pin function select bit (RE3/MCLR pin function is digital input, MCLR internally tied to VDD)
+#pragma config CP = OFF         // Code Protection bit (Program memory code protection is disabled)
+#pragma config CPD = OFF        // Data Code Protection bit (Data memory code protection is disabled)
+#pragma config BOREN = OFF      // Brown Out Reset Selection bits (BOR disabled)
+#pragma config IESO = OFF       // Internal External Switchover bit (Internal/External Switchover mode is disabled)
+#pragma config FCMEN = OFF      // Fail-Safe Clock Monitor Enabled bit (Fail-Safe Clock Monitor is disabled)
+#pragma config LVP = OFF        // Low Voltage Programming Enable bit (RB3 pin has digital I/O, HV on MCLR must be used for programming)
+
+// CONFIG2
+#pragma config BOR4V = BOR40V   // Brown-out Reset Selection bit (Brown-out Reset set to 4.0V)
+#pragma config WRT = OFF        // Flash Program Memory Self Write Enable bits (Write protection off)
+
+// #pragma config statements should precede project file includes.
+// Use project enums instead of #define for ON and OFF.
+
+#include <xc.h>
+#include <stdint.h>
+#include <pic16f887.h>
+#include "SPI_conf.h"
+#include "LCD_conf.h"
+#include "UART.h"
+//#include "newxc8_header1.h"
+
+#define _XTAL_FREQ 1000000
+
+
+/*----------------------------------------------------------------------------*/
+/*                                  VARIABLES                                 */
+/*----------------------------------------------------------------------------*/
+uint8_t data;
+uint8_t yo = 0x6;
+uint8_t pot, cont, temp;
+
+uint8_t cont_c, cont_d, cont_u;
+uint8_t pot_d, pot_u;
+uint8_t temp_c, temp_d, temp_u;
+
+uint8_t int_to_ascii(uint8_t);
+
+/*----------------------------------------------------------------------------*/
+/*                                 PROTOTIPOS                                 */
+/*----------------------------------------------------------------------------*/
+
+void setup(void);
+void SlaveSelect(uint8_t);
+void titulos(void);
+void valores(void);
+void pot_map(void);
+void cont_map(void);
+void temp_map(void);
+
+
+/*----------------------------------------------------------------------------*/
+/*                               INTERRUPCIONES                               */
+/*----------------------------------------------------------------------------*/
+
+void __interrupt() isr (void)
+{
+    
+}
+
+
+
+/*----------------------------------------------------------------------------*/
+/*                                  MAIN LOOP                                 */
+/*----------------------------------------------------------------------------*/
+
+void main(void)
+{
+    setup();
+    init_LCD();
+    SPI_MasterMode();
+    UartSetup();
+    
+    /*
+    Lcd_Init();
+    Lcd_Clear();
+    Lcd_Set_Cursor(1,1);
+    Lcd_Write_String('S1   S2   S3');
+    */
+    
+    
+    SetCursor(0x0);
+    WriteChar('S');
+    WriteChar('1');
+    WriteChar(':');
+    
+    SetCursor(0x6);
+    WriteChar('S');
+    WriteChar('2');
+    WriteChar(':');
+    
+    SetCursor(0x0C);
+    WriteChar('S');
+    WriteChar('3');
+    WriteChar(':');
+    
+    while (1)
+    {
+        /* ---- SPI ---- */
+        
+        //obtener valor del potenciometro - S1
+        __delay_ms(20);
+        SlaveSelect(1);
+        SPI_Write(yo);
+        pot = SPI_Read();
+
+        //obtener contador - S2
+        SlaveSelect(2);
+        __delay_ms(20);
+        SPI_Write(yo);
+        __delay_ms(5);
+        cont = SPI_Read();
+        
+        //obtener temperatura - S3
+        __delay_ms(20);
+        SlaveSelect(3);
+        __delay_ms(1);
+        SPI_Write(yo);
+        temp = SPI_Read();
+        
+        
+        
+        /* ---- Mapeo ---- */
+        pot_map();
+        cont_map();
+        temp_map();
+        
+        
+        /* ---- UART ---- */
+        /*
+        UartString('S1:   S2:   S3:');
+        UartChar(13);
+        UartChar(int_to_ascii(pot_d));
+        UartChar('.');
+        UartChar(int_to_ascii(pot_u));
+        UartString('   ');
+        UartChar(int_to_ascii(cont_c));
+        UartChar(int_to_ascii(cont_d));
+        UartChar(int_to_ascii(cont_u));
+        UartString('   ');
+        UartChar(int_to_ascii(temp_d));
+        UartChar(int_to_ascii(temp_u));
+        UartString(' C');
+        */
+        if (PIR1bits.TXIF)
+        {
+            titulos();
+            valores();
+        }
+        
+        //while (!TXSTAbits.TRMT);
+        //TXREG = 'a';
+        
+        
+        /* ---- LCD ---- */
+        
+        SetCursor(0x40);
+        WriteChar(int_to_ascii(pot_d));
+        WriteChar('.');
+        WriteChar(int_to_ascii(pot_d));
+        WriteChar('V');
+        
+        SetCursor(0x46);
+        WriteChar(int_to_ascii(cont_c));
+        WriteChar(int_to_ascii(cont_d));
+        WriteChar(int_to_ascii(cont_u));
+        
+        SetCursor(0x4D);
+        WriteChar(int_to_ascii(temp_d));
+        WriteChar(int_to_ascii(temp_u));
+        WriteChar('C');
+    }
+}
+
+
+/*----------------------------------------------------------------------------*/
+/*                                  FUNCIONES                                 */
+/*----------------------------------------------------------------------------*/
+
+void setup(void)
+{
+    // port_conf
+    ANSEL = 0;
+    ANSELH = 0;
+    
+    TRISA = 0;
+    TRISB = 0;
+    //TRISC = 0b10010000; //TX como salida y RX como entrada, salida SCK
+    TRISCbits.TRISC5 = 0;
+    TRISCbits.TRISC3 = 0;
+    TRISCbits.TRISC4 = 1;
+    TRISD = 0;
+    TRISE = 0;
+    
+    PORTA = 0;
+    PORTB = 0;
+    PORTC = 0;
+    PORTD = 0;
+    PORTE = 0;
+
+    
+    //osc_conf
+    OSCCONbits.IRCF = 0b100; //1 MHz
+    OSCCONbits.SCS = 1;      //internal used for system clk
+
+    
+
+    return;
+}
+
+
+void SlaveSelect(uint8_t ss)
+{
+    switch (ss)
+    {
+        case 1:                 //slave 1 - pot
+            PORTAbits.RA0 = 1; 
+            PORTDbits.RD2 = 0; 
+            PORTDbits.RD3 = 1; 
+            __delay_ms(1);
+            break;
+            
+        case 2:                 //slave 2 - cont
+            PORTAbits.RA0 = 0; 
+            PORTDbits.RD2 = 1; 
+            PORTDbits.RD3 = 1; 
+            __delay_ms(1);
+            break;
+            
+        case 3:                 //slave 3 - temp
+            PORTAbits.RA0 = 1; 
+            PORTDbits.RD2 = 1; 
+            PORTDbits.RD3 = 0; 
+            __delay_ms(1);
+            break;
+            
+        default:                //no se comunica con ninguno
+            PORTAbits.RA0 = 1; 
+            PORTDbits.RD2 = 1; 
+            PORTDbits.RD3 = 1; 
+            __delay_ms(1);
+            break;
+    }
+}
+
+void titulos(void)
+{
+    //TXSTAbits.TRMT
+    TXREG = 'S';
+    __delay_ms(10);
+    TXREG = '1';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    
+    TXREG = 'S';
+    __delay_ms(10);
+    TXREG = '2';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    
+    TXREG = 'S';
+    __delay_ms(10);
+    TXREG = '3';
+    __delay_ms(10);
+
+    
+    TXREG = 13;
+    __delay_ms(10);
+
+}
+
+void valores(void)
+{
+    //potenciometro
+    TXREG = int_to_ascii(pot_d);
+    __delay_ms(10);
+    TXREG = '.';
+    __delay_ms(10);
+    TXREG = int_to_ascii(pot_u);
+    __delay_ms(10);
+    TXREG = 'V';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    
+    
+    //contador
+    TXREG = int_to_ascii(cont_c);
+    __delay_ms(10);
+    TXREG = int_to_ascii(cont_d);
+    __delay_ms(10);
+    TXREG = int_to_ascii(cont_u);
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+
+    
+    
+    
+    //temperatura
+    //contador
+    TXREG = int_to_ascii(temp_c);
+    __delay_ms(10);
+    TXREG = int_to_ascii(temp_d);
+    __delay_ms(10);
+    TXREG = int_to_ascii(temp_u);
+    __delay_ms(10);
+    TXREG = ' ';
+    __delay_ms(10);
+    TXREG = 'C';
+    __delay_ms(10);
+    
+    
+    
+    TXREG = 13;
+    __delay_ms(10);
+    TXREG = 13;
+    __delay_ms(10);
+}
+
+void pot_map(void)
+{
+    pot = pot*50/255;
+    
+    pot_d = pot%10;
+    pot_u = (pot/10)%10;
+}
+
+void cont_map(void)
+{
+    cont_u = cont%10;
+    cont_d = (cont/10)%10;
+    cont_c = (cont/100)%10;
+}
+
+void temp_map(void)
+{
+    temp = (temp*500/256)+2;
+    
+    temp_u = temp%10;
+    temp_d = (temp/10)%10;
+    temp_c = (temp/100)%10;
+}
+
+uint8_t int_to_ascii(uint8_t x)
+{
+    return x+48;
+}
